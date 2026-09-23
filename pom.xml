@@ -1,0 +1,22 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.aops</groupId>
+    <artifactId>async-order-system</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+
+    <packaging>pom</packaging>
+
+    <modules>
+        <module>common-events</module>
+        <module>common-security</module>
+        <module>auth-service</module>
+        <module>order-service</module>
+        <module>payment-service</module>
+        <module>notification-service</module>
+        <module>gateway-service</module>
+        <module>discovery-service</module>
+    </modules>
+
+</project>
