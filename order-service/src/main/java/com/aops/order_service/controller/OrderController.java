@@ -6,6 +6,7 @@ import com.aops.order_service.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -66,7 +67,7 @@ public class OrderController {
     @PostMapping
     @PreAuthorize("hasRole('USER')")
     public OrderResponse createOrder(
-            @RequestBody CreateOrderRequest request) {
+            @Valid @RequestBody CreateOrderRequest request) {
 
         return orderService.createOrder(request);
     }
