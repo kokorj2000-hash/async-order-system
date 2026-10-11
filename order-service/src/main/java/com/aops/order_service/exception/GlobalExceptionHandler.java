@@ -16,4 +16,12 @@ public class GlobalExceptionHandler {
                 .body(ex.getMessage());
     }
 
+    @ExceptionHandler(OrderAlreadyPaidException.class)
+    public ResponseEntity<String> handleOrderAlreadyPaid(OrderAlreadyPaidException ex) {
+
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(ex.getMessage());
+    }
+
 }

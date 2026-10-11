@@ -10,7 +10,8 @@ import lombok.Setter;
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "payments")
+@Table(name = "payments",
+        uniqueConstraints = @UniqueConstraint(name = "uq_payments_order_id", columnNames = "order_id"))
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter

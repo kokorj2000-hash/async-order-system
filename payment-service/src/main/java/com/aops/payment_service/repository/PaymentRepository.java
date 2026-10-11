@@ -12,4 +12,6 @@ public interface PaymentRepository
     List<Payment> findByUserId(Long userId);
 
     Optional<Payment> findByOrderId(Long orderId);
+
+    boolean existsByOrderId(Long orderId);
 }

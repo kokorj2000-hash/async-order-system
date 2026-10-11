@@ -11,6 +11,9 @@ import com.aops.payment_service.model.Payment;
 import com.aops.payment_service.producer.PaymentProducer;
 import com.aops.payment_service.repository.PaymentRepository;
 import com.aops.payment_service.service.PaymentService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
@@ -18,6 +21,9 @@ import java.util.List;
 
 @Service
 public class PaymentServiceImpl implements PaymentService {
+
+    private static final Logger log =
+            LoggerFactory.getLogger(PaymentServiceImpl.class);
 
     private final PaymentRepository paymentRepository;
     private final PaymentMapper paymentMapper;
@@ -34,14 +40,22 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     public void createPayment(OrderCreatedEvent event) {
 
-        Payment payment = new Payment();
+        if (paymentRepository.existsByOrderId(event.getId())) {
+            log.info("Payment for orderId={} already exists, skipping duplicate event", event.getId());
+            return;
+        }
 
+        Payment payment = new Payment();
         payment.setOrderId(event.getId());
         payment.setUserId(event.getUserId());
         payment.setAmount(event.getAmount());
         payment.setStatus(event.getStatus());
 
-        paymentRepository.save(payment);
+        try {
+            paymentRepository.save(payment);
+        } catch (DataIntegrityViolationException e) {
+            log.info("Concurrent duplicate payment ignored for orderId={}", event.getId());
+        }
     }
 
     @Override
@@ -53,6 +67,11 @@ public class PaymentServiceImpl implements PaymentService {
         if (!payment.getUserId().equals(CurrentUser.getId())) {
 
             throw new AccessDeniedException("Access denied");
+        }
+
+        if (payment.getStatus() == OrderStatus.PAID) {
+            log.info("Payment id={} is already PAID, skipping", id);
+            return paymentMapper.toResponse(payment);
         }
 
         payment.setStatus(OrderStatus.PAID);

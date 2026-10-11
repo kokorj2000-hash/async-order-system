@@ -5,6 +5,7 @@ import com.aops.common.model.OrderStatus;
 import com.aops.common.security.CurrentUser;
 import com.aops.order_service.dto.request.CreateOrderRequest;
 import com.aops.order_service.dto.response.OrderResponse;
+import com.aops.order_service.exception.OrderAlreadyPaidException;
 import com.aops.order_service.exception.OrderNotFoundException;
 import com.aops.order_service.mapper.OrderMapper;
 import com.aops.order_service.model.Order;
@@ -139,6 +140,11 @@ public class OrderServiceImpl implements OrderService {
                     return new OrderNotFoundException(id);
                 });
 
+        if (order.getStatus() == OrderStatus.PAID) {
+            log.info("Order id={} is already PAID, skipping redundant update", id);
+            return;
+        }
+
         order.setStatus(OrderStatus.PAID);
 
         orderRepository.save(order);
@@ -170,6 +176,11 @@ public class OrderServiceImpl implements OrderService {
             );
 
             throw new AccessDeniedException("Access denied");
+        }
+
+        if (order.getStatus() == OrderStatus.PAID) {
+            log.warn("Attempt to delete a paid order. orderId={}", id);
+            throw new OrderAlreadyPaidException(id);
         }
 
         orderRepository.deleteById(id);

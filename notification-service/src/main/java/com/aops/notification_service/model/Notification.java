@@ -7,7 +7,10 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "notifications")
+@Table(name = "notifications",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uq_notifications_order_id_type",
+                columnNames = {"order_id", "type"}))
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter
@@ -26,5 +29,9 @@ public class Notification {
 
     @Column(nullable = false)
     private String message;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private NotificationType type;
 
 }
