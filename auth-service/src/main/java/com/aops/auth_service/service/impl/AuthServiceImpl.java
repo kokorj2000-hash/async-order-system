@@ -4,6 +4,9 @@ import com.aops.auth_service.dto.request.LoginRequest;
 import com.aops.auth_service.dto.request.RefreshTokenRequest;
 import com.aops.auth_service.dto.request.RegisterRequest;
 import com.aops.auth_service.dto.response.AuthResponse;
+import com.aops.auth_service.exception.InvalidRefreshTokenException;
+import com.aops.auth_service.exception.UserNotFoundException;
+import com.aops.auth_service.exception.UsernameAlreadyExistsException;
 import com.aops.auth_service.model.Role;
 import com.aops.auth_service.model.User;
 import com.aops.auth_service.repository.UserRepository;
@@ -45,8 +48,7 @@ public class AuthServiceImpl implements AuthService {
             log.warn("Registration failed. Username already exists. username={}",
                     request.getUsername());
 
-            throw new RuntimeException("Username already exists");
-        }
+            throw new UsernameAlreadyExistsException(request.getUsername());        }
 
         User user = User.builder()
                 .username(request.getUsername())
@@ -74,7 +76,7 @@ public class AuthServiceImpl implements AuthService {
         );
 
         User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow();
+                .orElseThrow(() -> new UserNotFoundException(request.getUsername()));
 
         String accessToken = jwtService.generateAccessToken(user);
         String refreshToken = jwtService.generateRefreshToken(user);
@@ -97,13 +99,13 @@ public class AuthServiceImpl implements AuthService {
 
             log.warn("Refresh token validation failed.");
 
-            throw new RuntimeException("Invalid refresh token");
+            throw new InvalidRefreshTokenException();
         }
 
         Long userId = Long.valueOf(jwtService.extractUserId(refreshToken));
 
         User user = userRepository.findById(userId)
-                .orElseThrow();
+                .orElseThrow(() -> new UserNotFoundException(userId));
 
         String newAccessToken = jwtService.generateAccessToken(user);
 
