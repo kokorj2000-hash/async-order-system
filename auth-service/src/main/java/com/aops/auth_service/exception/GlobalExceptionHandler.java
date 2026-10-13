@@ -9,27 +9,27 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(UsernameAlreadyExistsException.class)
-    public ResponseEntity<String> handleUsernameAlreadyExists(UsernameAlreadyExistsException ex) {
+    public ResponseEntity<ErrorResponse> handleUsernameAlreadyExists(UsernameAlreadyExistsException ex) {
 
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
-                .body(ex.getMessage());
+                .body(ErrorResponse.of("USERNAME_ALREADY_EXISTS", ex.getMessage()));
     }
 
     @ExceptionHandler(InvalidRefreshTokenException.class)
-    public ResponseEntity<String> handleInvalidRefreshToken(InvalidRefreshTokenException ex) {
+    public ResponseEntity<ErrorResponse> handleInvalidRefreshToken(InvalidRefreshTokenException ex) {
 
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
-                .body(ex.getMessage());
+                .body(ErrorResponse.of("INVALID_REFRESH_TOKEN", ex.getMessage()));
     }
 
     @ExceptionHandler(UserNotFoundException.class)
-    public ResponseEntity<String> handleUserNotFound(UserNotFoundException ex) {
+    public ResponseEntity<ErrorResponse> handleUserNotFound(UserNotFoundException ex) {
 
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
-                .body(ex.getMessage());
+                .body(ErrorResponse.of("USER_NOT_FOUND", ex.getMessage()));
     }
 
 }

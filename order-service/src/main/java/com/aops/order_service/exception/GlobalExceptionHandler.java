@@ -10,23 +10,23 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(OrderNotFoundException.class)
-    public ResponseEntity<String> handleOrderNotFound(OrderNotFoundException ex) {
+    public ResponseEntity<ErrorResponse> handleOrderNotFound(OrderNotFoundException ex) {
 
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
-                .body(ex.getMessage());
+                .body(ErrorResponse.of("ORDER_NOT_FOUND", ex.getMessage()));
     }
 
     @ExceptionHandler(OrderAlreadyPaidException.class)
-    public ResponseEntity<String> handleOrderAlreadyPaid(OrderAlreadyPaidException ex) {
+    public ResponseEntity<ErrorResponse> handleOrderAlreadyPaid(OrderAlreadyPaidException ex) {
 
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
-                .body(ex.getMessage());
+                .body(ErrorResponse.of("ORDER_ALREADY_PAID", ex.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<String> handleValidationError(MethodArgumentNotValidException ex) {
+    public ResponseEntity<ErrorResponse> handleValidationError(MethodArgumentNotValidException ex) {
 
         String message = ex.getBindingResult().getFieldErrors().stream()
                 .findFirst()
@@ -35,7 +35,7 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(message);
+                .body(ErrorResponse.of("VALIDATION_ERROR", message));
     }
 
 }
