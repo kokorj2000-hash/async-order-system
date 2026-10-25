@@ -1,5 +1,6 @@
 package com.aops.order_service.service.impl;
 
+import com.aops.common.constant.KafkaTopics;
 import com.aops.common.event.OrderCreatedEvent;
 import com.aops.common.model.OrderStatus;
 import com.aops.common.security.CurrentUser;
@@ -9,13 +10,14 @@ import com.aops.order_service.exception.OrderAlreadyPaidException;
 import com.aops.order_service.exception.OrderNotFoundException;
 import com.aops.order_service.mapper.OrderMapper;
 import com.aops.order_service.model.Order;
-import com.aops.order_service.producer.OrderProducer;
 import com.aops.order_service.repository.OrderRepository;
 import com.aops.order_service.service.OrderService;
+import com.aops.order_service.service.OutboxService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -27,14 +29,14 @@ public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepository;
     private final OrderMapper orderMapper;
-    private final OrderProducer orderProducer;
+    private final OutboxService outboxService;
 
     public OrderServiceImpl(OrderRepository orderRepository,
                             OrderMapper orderMapper,
-                            OrderProducer orderProducer) {
+                            OutboxService outboxService) {
         this.orderRepository = orderRepository;
         this.orderMapper = orderMapper;
-        this.orderProducer = orderProducer;
+        this.outboxService = outboxService;
     }
 
     @Override
@@ -89,6 +91,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional
     public OrderResponse createOrder(CreateOrderRequest request) {
 
         Long userId = CurrentUser.getId();
@@ -118,7 +121,11 @@ public class OrderServiceImpl implements OrderService {
                 savedOrder.getStatus()
         );
 
-        orderProducer.sendOrderCreatedEvent(event);
+        outboxService.save(
+                KafkaTopics.ORDER_CREATED,
+                savedOrder.getId().toString(),
+                event
+        );
 
         log.info(
                 "Order created successfully. orderId={}, userId={}",

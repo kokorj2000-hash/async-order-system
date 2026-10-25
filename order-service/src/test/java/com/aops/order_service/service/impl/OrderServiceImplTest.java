@@ -1,6 +1,6 @@
-
 package com.aops.order_service.service.impl;
 
+import com.aops.common.constant.KafkaTopics;
 import com.aops.common.event.OrderCreatedEvent;
 import com.aops.common.model.OrderStatus;
 import com.aops.common.security.CurrentUser;
@@ -8,8 +8,8 @@ import com.aops.order_service.dto.request.CreateOrderRequest;
 import com.aops.order_service.dto.response.OrderResponse;
 import com.aops.order_service.mapper.OrderMapper;
 import com.aops.order_service.model.Order;
-import com.aops.order_service.producer.OrderProducer;
 import com.aops.order_service.repository.OrderRepository;
+import com.aops.order_service.service.OutboxService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,13 +34,13 @@ class OrderServiceImplTest {
     private OrderMapper orderMapper;
 
     @Mock
-    private OrderProducer orderProducer;
+    private OutboxService outboxService;
 
     @InjectMocks
     private OrderServiceImpl orderService;
 
     @Test
-    void shouldCreateOrderAndSendEvent() {
+    void shouldCreateOrderAndSaveEventToOutbox() {
 
         // Arrange
         CreateOrderRequest request = new CreateOrderRequest();
@@ -81,13 +82,18 @@ class OrderServiceImplTest {
 
             verify(orderRepository).save(order);
 
-            ArgumentCaptor<OrderCreatedEvent> eventCaptor =
-                    ArgumentCaptor.forClass(OrderCreatedEvent.class);
+            ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
 
-            verify(orderProducer).sendOrderCreatedEvent(eventCaptor.capture());
+            verify(outboxService).save(
+                    eq(KafkaTopics.ORDER_CREATED),
+                    eq("1"),
+                    eventCaptor.capture()
+            );
 
-            OrderCreatedEvent capturedEvent = eventCaptor.getValue();
+            OrderCreatedEvent capturedEvent =
+                    assertInstanceOf(OrderCreatedEvent.class, eventCaptor.getValue());
 
+            assertEquals(1L, capturedEvent.getId());
             assertEquals(10L, capturedEvent.getUserId());
             assertEquals(BigDecimal.valueOf(1200), capturedEvent.getAmount());
             assertEquals(OrderStatus.CREATED, capturedEvent.getStatus());
