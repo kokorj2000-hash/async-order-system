@@ -95,7 +95,7 @@ public class AuthServiceImpl implements AuthService {
 
         String refreshToken = request.getRefreshToken();
 
-        if (!jwtService.isTokenValid(refreshToken)) {
+        if (!jwtService.isRefreshToken(refreshToken)) {
 
             log.warn("Refresh token validation failed.");
 

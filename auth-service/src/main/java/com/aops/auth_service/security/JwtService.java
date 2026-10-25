@@ -14,6 +14,10 @@ import java.util.Date;
 @Service
 public class JwtService {
 
+    public static final String TYPE_CLAIM = "type";
+    public static final String ACCESS = "access";
+    public static final String REFRESH = "refresh";
+
     private final SecretKey secretKey;
 
     private final long accessTokenExpiration;
@@ -37,7 +41,8 @@ public class JwtService {
 
         return generateToken(
                 user,
-                accessTokenExpiration
+                accessTokenExpiration,
+                ACCESS
         );
     }
 
@@ -45,13 +50,15 @@ public class JwtService {
 
         return generateToken(
                 user,
-                refreshTokenExpiration
+                refreshTokenExpiration,
+                REFRESH
         );
     }
 
     private String generateToken(
             User user,
-            long expiration) {
+            long expiration,
+            String type) {
 
         Date now = new Date();
 
@@ -61,6 +68,7 @@ public class JwtService {
         return Jwts.builder()
                 .subject(String.valueOf(user.getId()))
                 .claim("role", user.getRole().name())
+                .claim(TYPE_CLAIM, type)
                 .issuedAt(now)
                 .expiration(expirationDate)
                 .signWith(secretKey, Jwts.SIG.HS384)
@@ -83,6 +91,18 @@ public class JwtService {
         try {
             getClaims(token);
             return true;
+
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public boolean isRefreshToken(String token) {
+
+        try {
+            return REFRESH.equals(
+                    getClaims(token).get(TYPE_CLAIM, String.class)
+            );
 
         } catch (Exception e) {
             return false;
