@@ -1,5 +1,6 @@
 package com.aops.payment_service.service.impl;
 
+import com.aops.common.constant.KafkaTopics;
 import com.aops.common.event.OrderCreatedEvent;
 import com.aops.common.event.OrderPaidEvent;
 import com.aops.common.model.OrderStatus;
@@ -8,14 +9,15 @@ import com.aops.payment_service.dto.response.PaymentResponse;
 import com.aops.payment_service.exception.PaymentNotFoundException;
 import com.aops.payment_service.mapper.PaymentMapper;
 import com.aops.payment_service.model.Payment;
-import com.aops.payment_service.producer.PaymentProducer;
 import com.aops.payment_service.repository.PaymentRepository;
+import com.aops.payment_service.service.OutboxService;
 import com.aops.payment_service.service.PaymentService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -27,14 +29,14 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final PaymentMapper paymentMapper;
-    private final PaymentProducer paymentProducer;
+    private final OutboxService outboxService;
 
     public PaymentServiceImpl(PaymentRepository paymentRepository,
                               PaymentMapper paymentMapper,
-                              PaymentProducer paymentProducer) {
+                              OutboxService outboxService) {
         this.paymentRepository = paymentRepository;
         this.paymentMapper = paymentMapper;
-        this.paymentProducer = paymentProducer;
+        this.outboxService = outboxService;
     }
 
     @Override
@@ -59,13 +61,13 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
+    @Transactional
     public PaymentResponse payOrderByPaymentId(Long id) {
 
         Payment payment = paymentRepository.findById(id)
                 .orElseThrow(() -> new PaymentNotFoundException(id));
 
         if (!payment.getUserId().equals(CurrentUser.getId())) {
-
             throw new AccessDeniedException("Access denied");
         }
 
@@ -75,16 +77,17 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         payment.setStatus(OrderStatus.PAID);
+        paymentRepository.save(payment);
 
         OrderPaidEvent event = new OrderPaidEvent();
-
         event.setOrderId(payment.getOrderId());
-
         event.setUserId(payment.getUserId());
 
-        paymentProducer.sendPaymentPayEvent(event);
-
-        paymentRepository.save(payment);
+        outboxService.save(
+                KafkaTopics.PAYMENT_COMPLETED,
+                payment.getOrderId().toString(),
+                event
+        );
 
         return paymentMapper.toResponse(payment);
     }
