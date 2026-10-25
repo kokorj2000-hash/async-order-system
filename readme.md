@@ -112,13 +112,54 @@ Notification Service
 1. A user authenticates through the **Auth Service**.
 2. The Auth Service issues an **Access Token** and **Refresh Token**.
 3. The client sends authenticated requests through the **API Gateway**.
-4. The **Order Service** stores the order in PostgreSQL.
-5. The Order Service publishes an `OrderCreatedEvent` to Kafka.
+4. The **Order Service** stores the order and an `OrderCreatedEvent` in the outbox table in a single transaction.
+5. The Order Service's `OutboxPublisher` publishes the event to Kafka.
 6. The **Payment Service** consumes the event and creates a payment.
-7. The Payment Service publishes an `OrderPaidEvent`.
+7. The Payment Service stores an `OrderPaidEvent` in its outbox in the same transaction as the payment status change, and its publisher sends it to Kafka.
 8. The **Notification Service** consumes the event and creates a notification.
 
 This keeps the business services loosely coupled and demonstrates asynchronous communication using Kafka.
+
+## Transactional Outbox
+
+**Problem.** Writing to PostgreSQL and publishing to Kafka cannot be done in one transaction.
+If Kafka is unavailable right after an order is saved, the event is lost and no payment is ever created.
+
+**Solution.** Order Service and Payment Service do not publish events directly.
+Inside the same database transaction that changes business data, they insert the event
+into an `outbox_event` table. A scheduled `OutboxPublisher` then reads unsent rows
+every second, publishes them to Kafka and sets `published_at`.
+
+```text
+Order Service
+  │  one transaction
+  ├─▶ orders        (INSERT)
+  └─▶ outbox_event  (INSERT)
+          │
+          │  OutboxPublisher (every 1s)
+          ▼
+        Kafka ──▶ Payment Service
+```
+
+**Guarantees**
+
+- The business change and its event are saved atomically: both or neither.
+- If Kafka is down, events stay in `outbox_event` and are sent after recovery.
+- Events are sent in `id` order, and publishing stops at the first failure to preserve ordering.
+- The message key is `orderId`, so events of one order stay ordered in Kafka.
+
+**Delivery semantics: at-least-once.** If a service crashes after sending an event
+but before marking it as published, the event is sent again.
+Consumers are idempotent (for example, Payment Service checks `existsByOrderId`
+and has a unique constraint on `order_id`), so duplicates are harmless.
+
+**Limitations**
+
+- The publisher polls the table instead of reading the WAL (CDC, e.g. Debezium).
+- No row locking between instances: with several replicas duplicates are possible
+  (acceptable because consumers are idempotent).
+- Published rows are not cleaned up yet.
+- `OutboxPublisher` is unit-tested in Order Service; Payment Service uses the same implementation.
 
 ## Services
 
@@ -401,7 +442,7 @@ Example:
 
 ```text
 Order saved to database. orderId=1, userId=1
-Sending OrderCreatedEvent to Kafka.
+Order created successfully. orderId=1, userId=1
 OrderCreatedEvent received. orderId=1
 Payment created from OrderCreatedEvent.
 ```
@@ -433,6 +474,10 @@ Building this project provided practical experience with:
 - using Testcontainers
 - working with Kafka consumers and offsets
 - structuring a multi-module Maven project
+- implementing the Transactional Outbox pattern
+- designing idempotent consumers for at-least-once delivery
+- managing schema changes with Flyway migrations
+- configuring retry with exponential backoff and Dead Letter Topics
 
 ## Future Improvements
 
@@ -441,9 +486,8 @@ Potential production-oriented improvements include:
 - centralized configuration with Spring Cloud Config
 - distributed tracing
 - metrics and monitoring
-- retry policies
-- Dead Letter Topics (DLT)
-- database migrations with Flyway
+- Change Data Capture (Debezium) instead of outbox polling
+- cleanup of published outbox rows
 
 ## License
 
